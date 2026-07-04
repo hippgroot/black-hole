@@ -1,0 +1,12 @@
+push {
+  uvec2 _ScreenDims;
+};
+
+in vec2 _UV;
+
+out vec4 _FragColor;
+
+void main() {
+  vec2 uv = 0.5 * (_UV + 1.0);
+  _FragColor = vec4(uv, 0.0, 1.0);
+}
