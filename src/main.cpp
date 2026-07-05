@@ -1,17 +1,30 @@
+#include "camera.hpp"
+
 #include <grf/grf.hpp>
 
 #include <format>
-#include <grf/types.hpp>
 
 using namespace grf;
 
-const u32 g_flightFrames = 2;
+const     u32 g_flightFrames = 2;
 
 int main() {
   GRF grf(Settings{
     .windowTitle  = "Black Hole Simulation",
     .flightFrames = g_flightFrames
   });
+
+  Camera camera;
+
+  auto resizeCallback = [&](u32 w , u32 h) {
+    f32 ar = static_cast<f32>(w) / static_cast<f32>(h);
+    camera.setAspect(ar);
+  };
+  grf.resizeCallback(resizeCallback);
+{
+  auto [w, h] = grf.screenDims();
+  resizeCallback(w, h);
+}
 
   BlendState alphaBlend{
     .enable = true,
@@ -28,14 +41,23 @@ int main() {
     .blends       = { alphaBlend }
   });
 
+  Buffer camBuf = grf.createBuffer(BufferIntent::FrequentUpdate, sizeof(Camera::Matrices));
+
   Ring<Sync> syncRing = grf.createSyncRing();
   Ring<CommandBuffer> cmdRing = grf.createCmdRing(QueueType::Graphics);
 
   Input& input = grf.input();
   while (grf.running([&](){ return input.isJustPressed(Key::Escape); })) {
+    if (camera.needsUpdate()) {
+      camera.update();
+      camBuf.write(camera.matrices());
+    }
+
     auto [frameIndex, dt] = grf.beginFrame();
     grf.gui().beginFrame();
+
     grf.profiler().render();
+    camera.settingsGUI();
 
     auto& sync = syncRing[frameIndex];
     auto& cmd = cmdRing[frameIndex];
@@ -72,5 +94,22 @@ int main() {
 
     sync = grf.submit(cmd, { renderTarget.sync() });
     grf.present(renderTarget, { sync });
+
+    vec3 inputDir = vec3(
+      input.isPressed(Key::D) - input.isPressed(Key::A),
+      input.isPressed(Key::Space) - input.isPressed(Key::LeftShift),
+      input.isPressed(Key::S) - input.isPressed(Key::W)
+    );
+    if (inputDir != vec3(0.0)) {
+      vec3 delta = camera.speed() * glm::normalize(inputDir) * dt;
+      camera.translate(delta);
+    }
+
+    if (input.isPressed(MouseButton::Left)) {
+      auto [dx, dy] = input.cursorDelta();
+      camera.rotate(-dx * camera.sensitivity(), -dy * camera.sensitivity());
+    }
+
+    grf.endFrame();
   }
 }

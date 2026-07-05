@@ -8,8 +8,13 @@ set(CMAKE_CXX_STANDARD 26)
 find_package(grf REQUIRED)
 
 add_executable(black_hole
+  ${CMAKE_SOURCE_DIR}/include/camera.hpp
+
+  ${CMAKE_SOURCE_DIR}/src/camera.cpp
   ${CMAKE_SOURCE_DIR}/src/main.cpp
 )
+
+target_include_directories(black_hole PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
 target_compile_definitions(black_hole PRIVATE
   SHADER_DIR="${CMAKE_SOURCE_DIR}/shaders"
