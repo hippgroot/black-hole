@@ -35,8 +35,9 @@ void Camera::update() {
   m_up      = m_rotation * vec3(0.0, 1.0, 0.0);
   m_forward = m_rotation * vec3(0.0, 0.0, -1.0);
 
-  m_matrices.proj = glm::perspective(glm::radians(m_fov), m_aspect, m_near, m_far);
-  m_matrices.view = glm::lookAt(m_position, m_position + m_forward, m_up);
+  m_matrices.proj     = glm::perspective(glm::radians(m_fov), m_aspect, m_near, m_far);
+  m_matrices.view     = glm::lookAt(m_position, m_position + m_forward, m_up);
+  m_matrices.position = vec4(m_position, 0.0);
 
   m_dirty = false;
 }

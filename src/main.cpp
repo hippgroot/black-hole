@@ -1,6 +1,7 @@
 #include "camera.hpp"
 
 #include <grf/grf.hpp>
+#include <grf/imgui.h>
 
 #include <format>
 
@@ -12,6 +13,7 @@ struct TracePC {
   u32   bgIndex;
   u32   outputIndex;
   u32   samplerIndex;
+  f32   rs;
 };
 
 struct DrawPC {
@@ -31,6 +33,7 @@ int main() {
   });
 
   Camera camera;
+  f32 schwarzschildRadius = 1.0f;
 
   auto resizeCallback = [&](u32 w , u32 h) {
     f32 ar = static_cast<f32>(w) / static_cast<f32>(h);
@@ -62,7 +65,6 @@ int main() {
 
   Buffer camBuf = grf.createBuffer(BufferIntent::FrequentUpdate, sizeof(Camera::Matrices));
 
-  // Repeat in u so the spheremap wraps across the atan seam
   Sampler linearSampler = grf.createSampler(SamplerSettings{
     .uMode = SampleMode::Repeat,
     .vMode = SampleMode::ClampToEdge
@@ -99,6 +101,10 @@ int main() {
     grf.profiler().render();
     camera.settingsGUI();
 
+    ImGui::Begin("Simulation");
+      ImGui::SliderFloat("rs", &schwarzschildRadius, 0.0f, 5.0f, "%.2f");
+    ImGui::End();
+
     auto& sync = syncRing[frameIndex];
     auto& cmd = cmdRing[frameIndex];
 
@@ -123,7 +129,8 @@ int main() {
       .screenDims = uvec2(w, h),
       .bgIndex = starBackground.heapIndex(),
       .outputIndex = traceOutput.storageHeapIndex(),
-      .samplerIndex = linearSampler.heapIndex()
+      .samplerIndex = linearSampler.heapIndex(),
+      .rs = schwarzschildRadius
     });
 
     auto [x, y, _] = traceShader.threadGroup();

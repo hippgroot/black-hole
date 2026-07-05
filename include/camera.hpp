@@ -9,6 +9,7 @@ public:
   struct Matrices {
     mat4 view;
     mat4 proj;
+    vec4 position;
   };
 
 private:
@@ -21,7 +22,6 @@ private:
   vec3      m_forward = vec3(0.0, 0.0, -1.0);
   f32       m_pitch = 0.0f;
 
-  // cursorDelta is normalized (full-screen swipe = ±2), not pixels
   f32       m_sensitivity = 1.5f;
   f32       m_speed = 10.0f;
   f32       m_aspect = 0.0f;

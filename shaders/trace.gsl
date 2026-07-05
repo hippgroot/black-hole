@@ -1,6 +1,7 @@
 readonly buffer {
   mat4 view;
   mat4 proj;
+  vec4 position;
 } _Camera;
 
 push {
@@ -8,11 +9,29 @@ push {
   uint  _BGIndex;
   uint  _OutputIndex;
   uint  _SamplerIndex;
+  float _Rs;
 };
 
 thread_group [ 32, 32, 1 ];
 
 const float PI = 3.14159265358979323846;
+
+const int   MAX_STEPS = 384;
+const float STEP_FRAC = 0.1;
+const float CAPTURE_R = 0.02;
+const float ESCAPE_R  = 40.0;
+
+vec3 sampleSky(vec3 dir) {
+  float phi   = atan(dir.z, dir.x);
+  float theta = asin(clamp(dir.y, -1.0, 1.0));
+  vec2 mapUV  = vec2(0.5 + phi / (2.0 * PI), 0.5 - theta / PI);
+  return textureLod(sampler2D(grf_Tex2D[_BGIndex], grf_Sampler[_SamplerIndex]), mapUV, 0.0).rgb;
+}
+
+vec3 geodesicAccel(vec3 x, float h2) {
+  float r2 = max(dot(x, x), 1e-8);
+  return -1.5 * _Rs * h2 * x / (r2 * r2 * sqrt(r2));
+}
 
 void main() {
   uvec2 index = gl_GlobalInvocationID.xy;
@@ -22,13 +41,55 @@ void main() {
   vec2 ndc = vec2(2.0 * uv.x - 1.0, 1.0 - 2.0 * uv.y);
 
   vec3 viewDir = vec3(ndc.x / _Camera.proj[0][0], ndc.y / _Camera.proj[1][1], -1.0);
-  vec3 rayDir = normalize(transpose(mat3(_Camera.view)) * viewDir);
+  vec3 rayDir  = normalize(transpose(mat3(_Camera.view)) * viewDir);
 
-  float phi   = atan(rayDir.z, rayDir.x);
-  float theta = asin(clamp(rayDir.y, -1.0, 1.0));
-  vec2 mapUV  = vec2(0.5 + phi / (2.0 * PI), 0.5 - theta / PI);
+  vec3  camPos = _Camera.position.xyz;
+  float camR   = length(camPos);
 
-  vec3 color = textureLod(sampler2D(grf_Tex2D[_BGIndex], grf_Sampler[_SamplerIndex]), mapUV, 0.0).rgb;
+  vec3 color = vec3(0.0);
+  if (camR > CAPTURE_R * _Rs) {
+    vec3 rhat = camPos / camR;
+    vec3 v    = rayDir + sqrt(_Rs / camR) * rhat;
+
+    float vlen = length(v);
+    if (vlen < 1e-4) {
+      color = vec3(0.0);
+    } else if (_Rs < 1e-4 * camR) {
+      color = sampleSky(normalize(v));
+    } else {
+      v /= vlen;
+      vec3  x  = camPos;
+      float h2 = dot(cross(x, v), cross(x, v));
+
+      float captureR2 = CAPTURE_R * CAPTURE_R * _Rs * _Rs;
+      float escapeR   = max(ESCAPE_R * _Rs, 2.0 * camR);
+      float escapeR2  = escapeR * escapeR;
+
+      bool escaped = false;
+      for (int i = 0; i < MAX_STEPS; ++i) {
+        float r2 = dot(x, x);
+        if (r2 < captureR2) break;
+        if (r2 > escapeR2 && dot(x, v) > 0.0) { escaped = true; break; }
+
+        float r  = sqrt(r2);
+        float dl = STEP_FRAC * r / (1.0 + _Rs * h2 / (r2 * r));
+
+        vec3 k1x = v;
+        vec3 k1v = geodesicAccel(x, h2);
+        vec3 k2x = v + 0.5 * dl * k1v;
+        vec3 k2v = geodesicAccel(x + 0.5 * dl * k1x, h2);
+        vec3 k3x = v + 0.5 * dl * k2v;
+        vec3 k3v = geodesicAccel(x + 0.5 * dl * k2x, h2);
+        vec3 k4x = v + dl * k3v;
+        vec3 k4v = geodesicAccel(x + dl * k3x, h2);
+
+        x += dl / 6.0 * (k1x + 2.0 * k2x + 2.0 * k3x + k4x);
+        v += dl / 6.0 * (k1v + 2.0 * k2v + 2.0 * k3v + k4v);
+      }
+
+      if (escaped) color = sampleSky(normalize(v));
+    }
+  }
 
   imageStore(grf_Img2D[_OutputIndex], ivec2(index), vec4(color, 1.0));
 }
