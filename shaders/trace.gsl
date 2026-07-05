@@ -1,0 +1,34 @@
+readonly buffer {
+  mat4 view;
+  mat4 proj;
+} _Camera;
+
+push {
+  uvec2 _ScreenDims;
+  uint  _BGIndex;
+  uint  _OutputIndex;
+  uint  _SamplerIndex;
+};
+
+thread_group [ 32, 32, 1 ];
+
+const float PI = 3.14159265358979323846;
+
+void main() {
+  uvec2 index = gl_GlobalInvocationID.xy;
+  if (index.x >= _ScreenDims.x || index.y >= _ScreenDims.y) return;
+
+  vec2 uv  = (vec2(index) + 0.5) / vec2(_ScreenDims);
+  vec2 ndc = vec2(2.0 * uv.x - 1.0, 1.0 - 2.0 * uv.y);
+
+  vec3 viewDir = vec3(ndc.x / _Camera.proj[0][0], ndc.y / _Camera.proj[1][1], -1.0);
+  vec3 rayDir = normalize(transpose(mat3(_Camera.view)) * viewDir);
+
+  float phi   = atan(rayDir.z, rayDir.x);
+  float theta = asin(clamp(rayDir.y, -1.0, 1.0));
+  vec2 mapUV  = vec2(0.5 + phi / (2.0 * PI), 0.5 - theta / PI);
+
+  vec3 color = textureLod(sampler2D(grf_Tex2D[_BGIndex], grf_Sampler[_SamplerIndex]), mapUV, 0.0).rgb;
+
+  imageStore(grf_Img2D[_OutputIndex], ivec2(index), vec4(color, 1.0));
+}

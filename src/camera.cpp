@@ -20,7 +20,7 @@ f32 Camera::speed() const {
 
 void Camera::settingsGUI() {
   ImGui::Begin("Camera Settings");
-    ImGui::InputFloat("sensitivity", &m_sensitivity, 0.001f, 0.1f, "%.3f");
+    ImGui::InputFloat("sensitivity", &m_sensitivity, 0.05f, 0.25f, "%.2f");
     ImGui::InputFloat("speed", &m_speed, 1.0f, 5.0f, "%.0f");
     m_dirty |= ImGui::SliderFloat("fov", &m_fov, 30.0f, 120.0f, "%.0f");
     m_dirty |= ImGui::InputFloat("near", &m_near, 0.001f, 0.1f, "%0.3f");

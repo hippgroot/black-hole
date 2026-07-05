@@ -6,9 +6,25 @@
 
 using namespace grf;
 
-const     u32 g_flightFrames = 2;
+struct TracePC {
+  u64   camBufAddr;
+  uvec2 screenDims;
+  u32   bgIndex;
+  u32   outputIndex;
+  u32   samplerIndex;
+};
+
+struct DrawPC {
+  uvec2 screenDims;
+  u32   traceOutputIndex;
+  u32   samplerIndex;
+};
+
+const u32 g_flightFrames = 2;
 
 int main() {
+  auto pendStarBackground = readImage(std::format("{}/stars.hdr", ASSET_DIR));
+
   GRF grf(Settings{
     .windowTitle  = "Black Hole Simulation",
     .flightFrames = g_flightFrames
@@ -41,10 +57,34 @@ int main() {
     .blends       = { alphaBlend }
   });
 
+  Shader traceShader = grf.compileShader(ShaderType::Compute, std::format("{}/trace.gsl", SHADER_DIR));
+  ComputePipeline tracePipeline = grf.createComputePipeline(traceShader);
+
   Buffer camBuf = grf.createBuffer(BufferIntent::FrequentUpdate, sizeof(Camera::Matrices));
+
+  // Repeat in u so the spheremap wraps across the atan seam
+  Sampler linearSampler = grf.createSampler(SamplerSettings{
+    .uMode = SampleMode::Repeat,
+    .vMode = SampleMode::ClampToEdge
+  });
+  Tex2D starBackground;
+  Img2D traceOutput;
+{
+  auto [w, h] = grf.screenDims();
+  traceOutput = grf.createImg2D(Format::rgba16_sfloat, w, h);
+
+  std::vector<std::byte> zeros(4 * w * h, std::byte{});
+  traceOutput.write(zeros, Layout::ShaderReadOptimal);
+}
 
   Ring<Sync> syncRing = grf.createSyncRing();
   Ring<CommandBuffer> cmdRing = grf.createCmdRing(QueueType::Graphics);
+
+{
+  ImageData data = pendStarBackground.get();
+  starBackground = grf.createTex2D(data.format, data.width, data.height);
+  starBackground.write(data.bytes, Layout::ShaderReadOptimal);
+}
 
   Input& input = grf.input();
   while (grf.running([&](){ return input.isJustPressed(Key::Escape); })) {
@@ -72,15 +112,41 @@ int main() {
     };
 
     cmd.begin();
+
+    cmd.transition(traceOutput, Layout::ShaderReadOptimal, Layout::General);
+
+    cmd.bindPipeline(tracePipeline);
+  {
+    auto [w, h] = grf.screenDims();
+    cmd.push(TracePC{
+      .camBufAddr = camBuf.address(),
+      .screenDims = uvec2(w, h),
+      .bgIndex = starBackground.heapIndex(),
+      .outputIndex = traceOutput.storageHeapIndex(),
+      .samplerIndex = linearSampler.heapIndex()
+    });
+
+    auto [x, y, _] = traceShader.threadGroup();
+    cmd.beginProfile("trace");
+    cmd.dispatch((w + x - 1) / x, (h + y - 1) / y);
+    cmd.endProfile();
+  }
+
+    cmd.transition(traceOutput, Layout::General, Layout::ShaderReadOptimal);
     cmd.transition(renderTarget, Layout::Undefined, Layout::ColorAttachmentOptimal);
+
     cmd.beginRendering({ renderTargetAttachment });
 
-    cmd.beginProfile("draw");
     cmd.bindPipeline(drawPipeline);
   {
     auto [w, h] = grf.screenDims();
-    cmd.push(uvec2(w, h));
+    cmd.push(DrawPC{
+      .screenDims       = uvec2(w, h),
+      .traceOutputIndex = traceOutput.sampledHeapIndex(),
+      .samplerIndex     = linearSampler.heapIndex()
+    });
   }
+    cmd.beginProfile("draw");
     cmd.draw(6);
     cmd.endProfile();
 
@@ -95,17 +161,19 @@ int main() {
     sync = grf.submit(cmd, { renderTarget.sync() });
     grf.present(renderTarget, { sync });
 
-    vec3 inputDir = vec3(
-      input.isPressed(Key::D) - input.isPressed(Key::A),
-      input.isPressed(Key::Space) - input.isPressed(Key::LeftShift),
-      input.isPressed(Key::S) - input.isPressed(Key::W)
-    );
-    if (inputDir != vec3(0.0)) {
-      vec3 delta = camera.speed() * glm::normalize(inputDir) * dt;
-      camera.translate(delta);
+    if (!grf.gui().wantsKeyboard()) {
+      vec3 inputDir = vec3(
+        input.isPressed(Key::D) - input.isPressed(Key::A),
+        input.isPressed(Key::Space) - input.isPressed(Key::LeftShift),
+        input.isPressed(Key::S) - input.isPressed(Key::W)
+      );
+      if (inputDir != vec3(0.0)) {
+        vec3 delta = camera.speed() * glm::normalize(inputDir) * dt;
+        camera.translate(delta);
+      }
     }
 
-    if (input.isPressed(MouseButton::Left)) {
+    if (!grf.gui().wantsMouse() && input.isPressed(MouseButton::Left)) {
       auto [dx, dy] = input.cursorDelta();
       camera.rotate(-dx * camera.sensitivity(), -dy * camera.sensitivity());
     }

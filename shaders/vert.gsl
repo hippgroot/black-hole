@@ -1,5 +1,7 @@
 push {
   uvec2 _ScreenDims;
+  uint  _TraceOutputIndex;
+  uint  _SamplerIndex;
 };
 
 out vec2 _UV;
