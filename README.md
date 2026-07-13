@@ -124,7 +124,7 @@ $$
 \end{aligned}
 $$
 
-You can verify against the GP metric that $g(e_{\hat{T}}, e_{\hat{T}}) = -(1 - \frac{r_s}{r}) - 2\frac{r_s}{r} + \frac{r_s}{r} = -1$, with the cross term cancelling exactly
+You can verify against the GP metric that $g(e_{\hat{T}}, e_{\hat{T}}) = -(1 - \frac{r_s}{r}) - 2\frac{r_s}{r} + \frac{r_s}{r} = -1$, with the cross term cancelling exactly.
 
 For the initial condition, trace backward. The light we render arrived at the camera, so we follow its geodesic into the past. A photon arriving from the pixel direction $\hat{d}$ has local 4-velocity $v^{\hat{a}} = (1, -\hat{d})$ (null in the flat frame, moving toward the camera). Pushing it through the tetrad and flipping the sign to get the past-directed tangent, the spatial part comes out to:
 
@@ -145,12 +145,10 @@ Each pixel then runs RK4 on $(\vec{x}, \vec{v})$ with $\vec{a} = -\frac{3}{2}r_s
 
 $$ d\lambda = k \cdot \dfrac{r}{1 + \dfrac{r_sh^2}{r^3}} $$
 
-The numerator takes big steps far from the hole where rays are nearly straight. The denominator shrinks the step near the photon sphere ($r = \frac{3}{2}r_s$), where orbits are *unstable* and integration error grows exponentially. This term matters more than it looks: without it, near-critical rays that should be captured numerically escape, and the black hole's shadow renders visibly too small.
+The numerator takes big steps far from the hole where rays are nearly straight. The denominator shrinks the step near the photon sphere ($r = \frac{3}{2}r_s$), where orbits are unstable and integration error explodes.
 
 The loop terminates when:
 
-1. $r$ falls below a small threshold -- traced backward, this light would have had to come out of the past singularity, so we color it black.
-2. $r$ exceeds a large threshold while moving outward -- the ray escaped, and we sample the background spheremap along its (now essentially straight) direction.
-3. The step budget runs out -- the ray is stuck orbiting the photon sphere, i.e. it sits on the infinitely thin photon ring, so black is the honest answer.
-
-Since the whole integrator is analytic, we can check it against known exact results for Schwarzschild lensing. The critical impact parameter (the edge of the shadow) comes out to $b_{crit} = 2.5981r_s$ against the analytic $\frac{3\sqrt{3}}{2}r_s = 2.5981r_s$, and measured deflection angles match reference integrations to a fraction of a percent down to $b = 3r_s$. Not bad for a fake-Newtonian force law.
+1. $r$ falls below a small threshold. When traced backward, this light would have had to come out of the past singularity. The pixel is colored black.
+2. $r$ exceeds a large threshold while moving outward. The ray escaped, and the spheremap is sampled to get the color of the pixel.
+3. The step budget runs out. The ray is stuck orbiting the photon sphere so it never reaches the observer. The pixel is colored black.
