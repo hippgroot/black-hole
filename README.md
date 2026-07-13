@@ -1,6 +1,6 @@
 # Schwarzschild Black Hole Simulation
 
-![Black Hole Image](./black_hole_image.png)
+![Preview](./black_hole_image.png)
 
 ### Build Instructions
 
@@ -36,7 +36,7 @@ $$ \dfrac{4r_s^3}{r}e^{-\dfrac{r}{r_s}}(dT^2 - dR^2) - r^2d\theta^2 - r^2\sin^2\
 
 These coordinates maximally extended the Schwarzschild solution, showing that the event horizon is crossable and that $r = 0$ is a true singularity. In fact, it split up the Schwarzschild solution into four regions as shown below:
 
-![Kruskal Spacetime Diagram](./kruskal-diagram.png)
+![Diagram](./kruskal-diagram.png)
 > Image from [tikz.net](https://tikz.net/relativity_kruskal_diagram/)
 
 Region 1 corresponds to the region of spacetime of an observer outside of the event horizon. Region 2 corresponds to the region of spacetime inside of the black hole. All diagonal lines correspond to ingoing / outgoing light. As you can see, when inside of the event horizon light can never cross back outside of the event horizon and is destined to eventually contact the singularity (denoted by the squiggly red hyperbola).
