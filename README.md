@@ -4,7 +4,7 @@
 
 ### Build Instructions
 
-I use my own rendering framework, [Groot Rendering Framework](https://hipp.cloud/groothipp/Groot-Rendering-Framework/), to do all of the GPU work in this project. You will need to install this to build the simulation on your own computer. Other than that its standard CMake procedure:
+I use my own rendering framework, [Groot Rendering Framework](https://github.com/hippgroot/Groot-Rendering-Framework/), to do all of the GPU work in this project. You will need to install this to build the simulation on your own computer. Other than that its standard CMake procedure:
 
 ```
 cmake -B build
